@@ -1,524 +1,712 @@
-# “””
-News-Driven Stock Trading Bot v3
+<!DOCTYPE html>
 
-What’s new vs v2:
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="TradeBot"/>
+<title>TradeBot</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root{--bg:#0a0a0f;--surface:#13131a;--card:#1a1a24;--border:#2a2a3a;--accent:#00ff88;--accent2:#0088ff;--danger:#ff4466;--warn:#ffaa00;--text:#f0f0f8;--muted:#6a6a8a;--radius:16px;}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+.statusbar{height:env(safe-area-inset-top,20px);background:var(--bg);}
+header{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;background:rgba(10,10,15,0.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);}
+.logo{font-family:'Space Mono',monospace;font-size:18px;font-weight:700;color:var(--accent);}
+.logo span{color:var(--text);}
+.status-pill{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:6px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface);letter-spacing:.5px;text-transform:uppercase;transition:all .3s;}
+.status-pill.running{border-color:var(--accent);color:var(--accent);}
+.status-pill.paused{border-color:var(--warn);color:var(--warn);}
+.status-pill.stopped{border-color:var(--danger);color:var(--danger);}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor;}
+.dot.pulse{animation:pulse 1.4s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(.8);}}
+main{padding:20px 16px;padding-bottom:calc(90px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:16px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;position:relative;overflow:hidden;}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent);}
+.card-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin-bottom:10px;}
+.hero-value{font-family:'Space Mono',monospace;font-size:42px;font-weight:700;line-height:1;letter-spacing:-1px;}
+.hero-sub{margin-top:8px;display:flex;align-items:center;gap:10px;}
+.profit-badge{font-family:'Space Mono',monospace;font-size:14px;font-weight:700;padding:4px 10px;border-radius:8px;background:rgba(0,255,136,.12);color:var(--accent);border:1px solid rgba(0,255,136,.2);}
+.profit-badge.neg{background:rgba(255,68,102,.12);color:var(--danger);border-color:rgba(255,68,102,.2);}
+.progress-wrap{margin-top:16px;}
+.progress-labels{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:6px;font-family:'Space Mono',monospace;}
+.progress-track{height:6px;background:var(--border);border-radius:999px;overflow:hidden;}
+.progress-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width 1s ease;box-shadow:0 0 10px rgba(0,255,136,.4);}
+.milestone-label{margin-top:6px;font-size:11px;color:var(--muted);text-align:right;}
+.milestone-label span{color:var(--accent);font-weight:600;}
+.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:16px;}
+.stat-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;}
+.stat-val{font-family:'Space Mono',monospace;font-size:15px;font-weight:700;}
+.stat-lbl{font-size:10px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:.8px;}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.btn{border:none;border-radius:14px;padding:16px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;}
+.btn:active{transform:scale(.96);}
+.btn-start{background:var(--accent);color:#000;grid-column:1/-1;padding:18px;font-size:16px;box-shadow:0 0 30px rgba(0,255,136,.25);}
+.btn-pause{background:rgba(255,170,0,.15);color:var(--warn);border:1px solid rgba(255,170,0,.3);}
+.btn-stop{background:rgba(255,68,102,.15);color:var(--danger);border:1px solid rgba(255,68,102,.3);}
+.btn-restart{background:rgba(0,136,255,.15);color:var(--accent2);border:1px solid rgba(0,136,255,.3);grid-column:1/-1;display:none;}
+.market-status{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:12px;background:var(--surface);border:1px solid var(--border);font-size:13px;font-weight:500;}
+.market-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.market-dot.open{background:var(--accent);box-shadow:0 0 6px var(--accent);}
+.market-dot.closed{background:var(--danger);}
+.market-dot.pre{background:var(--warn);}
+.position-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border);}
+.position-row:last-child{border-bottom:none;}
+.pos-ticker{font-family:'Space Mono',monospace;font-size:15px;font-weight:700;}
+.pos-name{font-size:12px;color:var(--muted);margin-top:2px;}
+.pos-right{text-align:right;}
+.pos-val{font-family:'Space Mono',monospace;font-size:15px;font-weight:700;}
+.pos-change{font-size:12px;margin-top:2px;}
+.pos-change.up{color:var(--accent);}
+.pos-change.dn{color:var(--danger);}
+.empty-state{text-align:center;color:var(--muted);padding:24px 0;font-size:14px;}
+.activity-item{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);animation:fadeIn .4s ease;}
+.activity-item:last-child{border-bottom:none;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+.activity-icon{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.icon-buy{background:rgba(0,255,136,.12);}
+.icon-sell{background:rgba(255,68,102,.12);}
+.icon-alert{background:rgba(255,170,0,.12);}
+.icon-info{background:rgba(0,136,255,.12);}
+.activity-body{flex:1;}
+.activity-title{font-size:14px;font-weight:500;}
+.activity-meta{font-size:12px;color:var(--muted);margin-top:2px;}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(10px);z-index:200;align-items:flex-end;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:24px 24px 0 0;padding:28px 24px;padding-bottom:calc(28px + env(safe-area-inset-bottom,0px));width:100%;animation:slideUp .3s ease;}
+@keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+.modal h2{font-size:20px;font-weight:600;margin-bottom:6px;}
+.modal p{font-size:14px;color:var(--muted);margin-bottom:20px;}
+.modal input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;font-size:24px;font-family:'Space Mono',monospace;color:var(--text);text-align:center;margin-bottom:14px;outline:none;}
+.modal input:focus{border-color:var(--accent);}
+.modal-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.btn-cancel{background:var(--surface);color:var(--muted);border:1px solid var(--border);}
+.btn-confirm{background:var(--accent);color:#000;}
+nav{position:fixed;bottom:0;left:0;right:0;background:rgba(13,13,20,.95);backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;padding-bottom:env(safe-area-inset-bottom,0px);}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:12px 0;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);cursor:pointer;transition:color .2s;gap:4px;}
+.nav-item.active{color:var(--accent);}
+.nav-icon{font-size:18px;}
+.section{display:none;}
+.section.active{display:flex;flex-direction:column;gap:16px;}
+.wallet-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.wallet-stat{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;}
+.wallet-stat .val{font-family:'Space Mono',monospace;font-size:18px;font-weight:700;margin-top:4px;}
+.wallet-stat .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;}
+.wallet-stat.accent-green .val{color:var(--accent);}
+.wallet-stat.accent-blue .val{color:var(--accent2);}
+.wallet-stat.accent-red .val{color:var(--danger);}
+.cred-form{display:flex;flex-direction:column;gap:12px;}
+.cred-group{position:relative;}
+.cred-group label{display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;}
+.cred-group .input-wrap{position:relative;display:flex;align-items:center;}
+.cred-group input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:13px 44px 13px 14px;font-size:14px;font-family:'Space Mono',monospace;color:var(--text);outline:none;transition:border-color .2s;}
+.cred-group input:focus{border-color:var(--accent);}
+.eye-btn{position:absolute;right:12px;background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted);padding:4px;line-height:1;}
+.section-divider{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);padding:4px 0 2px;border-bottom:1px solid var(--border);margin-bottom:4px;}
+.btn-save{background:var(--accent);color:#000;border:none;border-radius:14px;padding:16px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;width:100%;}
+.note{font-size:12px;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;line-height:1.6;}
+.note strong{color:var(--warn);}
+.mode-toggle-wrap{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;}
+.mode-toggle-left{display:flex;flex-direction:column;gap:2px;}
+.mode-toggle-left .mode-title{font-size:15px;font-weight:600;}
+.mode-toggle-left .mode-sub{font-size:12px;color:var(--muted);}
+.toggle-track{width:52px;height:30px;border-radius:999px;background:var(--border);position:relative;cursor:pointer;transition:background .3s;flex-shrink:0;}
+.toggle-track.live{background:var(--danger);}
+.toggle-track.paper{background:var(--accent2);}
+.toggle-thumb{width:24px;height:24px;border-radius:50%;background:#fff;position:absolute;top:3px;left:3px;transition:transform .3s;box-shadow:0 1px 4px rgba(0,0,0,.3);}
+.toggle-track.live .toggle-thumb{transform:translateX(22px);}
+.mode-badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:6px;margin-top:4px;width:fit-content;}
+.mode-badge.paper-badge{background:rgba(0,136,255,.15);color:var(--accent2);border:1px solid rgba(0,136,255,.25);}
+.mode-badge.live-badge{background:rgba(255,68,102,.15);color:var(--danger);border:1px solid rgba(255,68,102,.25);}
+.live-warning{display:none;background:rgba(255,68,102,.1);border:1px solid rgba(255,68,102,.3);border-radius:12px;padding:12px 14px;font-size:13px;color:var(--danger);line-height:1.5;margin-top:12px;}
+.live-warning.show{display:block;}
+.quicklaunch-grid{display:flex;flex-direction:column;gap:10px;}
+.ql-btn{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;cursor:pointer;text-decoration:none;transition:all .2s;}
+.ql-btn:active{transform:scale(.97);border-color:var(--accent);}
+.ql-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.ql-body{flex:1;}
+.ql-name{font-size:15px;font-weight:600;color:var(--text);}
+.ql-desc{font-size:12px;color:var(--muted);margin-top:2px;}
+.ql-arrow{color:var(--muted);font-size:16px;}
+.transfer-type-btn{flex:1;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--muted);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;}
+.transfer-type-btn.active{background:rgba(0,255,136,.12);color:var(--accent);border-color:rgba(0,255,136,.3);}
+.transfer-type-btn.withdraw.active{background:rgba(255,68,102,.12);color:var(--danger);border-color:rgba(255,68,102,.3);}
+.transfer-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);}
+.transfer-row:last-child{border-bottom:none;}
+.transfer-left{display:flex;align-items:center;gap:10px;}
+.transfer-icon{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.transfer-note{font-size:14px;font-weight:500;}
+.transfer-date{font-size:12px;color:var(--muted);margin-top:2px;}
+.transfer-amount{font-family:'Space Mono',monospace;font-size:15px;font-weight:700;}
+.transfer-amount.dep{color:var(--accent);}
+.transfer-amount.wit{color:var(--danger);}
+</style>
+</head>
+<body>
+<div class="statusbar"></div>
+<header>
+  <div class="logo" id="logoEl">Trade<span>Bot</span></div>
+  <div class="status-pill stopped" id="statusPill">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusText">Stopped</span>
+  </div>
+</header>
+<main>
 
-- Market hours check (only trades 9:30am-4pm ET, Mon-Fri)
-- Pre-market news scan at 9am, ready at open
-- 8% take-profit (locks in gains before they reverse)
-- Minimum signal strength of 3 (filters weak/noisy headlines)
-- Trusted news sources only (Reuters, Bloomberg, WSJ, AP, CNBC)
-- Red day protection (no new buys if SPY down 1%+ on the day)
-- 3% stop-loss (carried over from v2)
-- Diversified ticker selection (carried over from v2)
-- Per-ticker cooldown (carried over from v2)
-  “””
+  <!-- DASHBOARD -->
 
-import time
-import smtplib
-import logging
-import requests
-from email.mime.text import MIMEText
-from datetime import datetime, timezone
-import pytz
+  <div class="section active" id="sec-dashboard">
+    <div class="market-status" id="marketStatus">
+      <div class="market-dot closed" id="marketDot"></div>
+      <span id="marketStatusText">Checking market hours...</span>
+    </div>
+    <div class="card">
+      <div class="card-label">Portfolio Value</div>
+      <div class="hero-value" id="portfolioVal">$50.00</div>
+      <div class="hero-sub">
+        <div class="profit-badge" id="profitBadge">+$0.00</div>
+        <div style="font-size:13px;color:var(--muted)" id="profitPct">0.00% total</div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-labels"><span>$0</span><span id="nextMilestoneLabel">Next: $100</span></div>
+        <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+        <div class="milestone-label">Withdraw at <span>$1,000 profit</span></div>
+      </div>
+      <div class="stats-row">
+        <div class="stat-box"><div class="stat-val" id="statBuyingPower">$50.00</div><div class="stat-lbl">Cash</div></div>
+        <div class="stat-box"><div class="stat-val" id="statPositions">0</div><div class="stat-lbl">Positions</div></div>
+        <div class="stat-box"><div class="stat-val" id="statTrades">0</div><div class="stat-lbl">Trades</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Controls</div>
+      <div class="controls">
+        <button class="btn btn-start" id="btnStart" onclick="startBot()">▶ Start Bot</button>
+        <button class="btn btn-pause" id="btnPause" onclick="pauseBot()" style="display:none">⏸ Pause</button>
+        <button class="btn btn-stop" id="btnStop" onclick="stopBot()" style="display:none">⏹ Stop</button>
+        <button class="btn btn-restart" id="btnRestart" onclick="openRestartModal()">↺ Set New Amount & Restart</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Open Positions</div>
+      <div id="positionsList"><div class="empty-state">No open positions</div></div>
+    </div>
+  </div>
 
-from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import MarketOrderRequest
-from alpaca.trading.enums import OrderSide, TimeInForce
-from alpaca.data.historical import StockHistoricalDataClient
-from alpaca.data.requests import StockLatestQuoteRequest, StockBarsRequest
-from alpaca.data.timeframe import TimeFrame
+  <!-- ACTIVITY -->
 
-# ─────────────────────────────────────────────
+  <div class="section" id="sec-activity">
+    <div class="card">
+      <div class="card-label">Activity Feed</div>
+      <div id="activityFeed"><div class="empty-state">No activity yet. Start the bot to begin.</div></div>
+    </div>
+  </div>
 
-# CONFIGURATION
+  <!-- WALLET -->
 
-# ─────────────────────────────────────────────
+  <div class="section" id="sec-wallet">
+    <div class="card">
+      <div class="card-label">Wallet Overview</div>
+      <div class="wallet-grid">
+        <div class="wallet-stat accent-green"><div class="lbl">Total Value</div><div class="val" id="wPortfolio">$50.00</div></div>
+        <div class="wallet-stat accent-blue"><div class="lbl">Buying Power</div><div class="val" id="wCash">$50.00</div></div>
+        <div class="wallet-stat accent-green"><div class="lbl">Total Profit</div><div class="val" id="wProfit">$0.00</div></div>
+        <div class="wallet-stat accent-red"><div class="lbl">Invested</div><div class="val" id="wInvested">$0.00</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Net Flow</div>
+      <div class="wallet-grid">
+        <div class="wallet-stat accent-green"><div class="lbl">Total Deposited</div><div class="val" id="wTotalDeposited">$0.00</div></div>
+        <div class="wallet-stat accent-red"><div class="lbl">Total Withdrawn</div><div class="val" id="wTotalWithdrawn">$0.00</div></div>
+        <div class="wallet-stat accent-green"><div class="lbl">Net Profit</div><div class="val" id="wNetProfit">$0.00</div></div>
+        <div class="wallet-stat"><div class="lbl">Cycles Run</div><div class="val" id="wCycles">0</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Transfer Funds via Alpaca</div>
+      <div class="quicklaunch-grid">
+        <a class="ql-btn" href="https://app.alpaca.markets/brokerage/banking" target="_blank">
+          <div class="ql-icon" style="background:rgba(0,255,136,.12)">💵</div>
+          <div class="ql-body"><div class="ql-name">Deposit Funds</div><div class="ql-desc">Add money via bank transfer</div></div>
+          <div class="ql-arrow">›</div>
+        </a>
+        <a class="ql-btn" href="https://app.alpaca.markets/brokerage/banking" target="_blank">
+          <div class="ql-icon" style="background:rgba(255,68,102,.12)">🏦</div>
+          <div class="ql-body"><div class="ql-name">Withdraw Funds</div><div class="ql-desc">Move profits back to your bank</div></div>
+          <div class="ql-arrow">›</div>
+        </a>
+      </div>
+      <div class="note" style="margin-top:12px">Transfers take 1–3 business days. Alpaca uses Plaid to securely link your bank.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Log a Transfer</div>
+      <div style="display:flex;gap:10px;margin-bottom:14px">
+        <button class="transfer-type-btn active" id="tTypeDeposit" onclick="setTransferType('deposit')">💵 Deposit</button>
+        <button class="transfer-type-btn" id="tTypeWithdraw" onclick="setTransferType('withdraw')">🏦 Withdraw</button>
+      </div>
+      <div class="cred-form">
+        <div class="cred-group"><label>Amount ($)</label><div class="input-wrap"><input type="number" id="transferAmt" placeholder="0.00" min="1"/></div></div>
+        <div class="cred-group"><label>Note (optional)</label><div class="input-wrap"><input type="text" id="transferNote" placeholder="e.g. Initial deposit"/></div></div>
+      </div>
+      <button class="btn-save" style="margin-top:14px" onclick="logTransfer()">Log Transfer</button>
+    </div>
+    <div class="card">
+      <div class="card-label">Transfer History</div>
+      <div id="transferHistory"><div class="empty-state">No transfers logged yet.</div></div>
+    </div>
+    <div class="card">
+      <div class="card-label">All-Time Stats</div>
+      <div class="wallet-grid">
+        <div class="wallet-stat"><div class="lbl">Milestones Hit</div><div class="val" id="wMilestones">0</div></div>
+        <div class="wallet-stat"><div class="lbl">Total Trades</div><div class="val" id="wTrades">0</div></div>
+        <div class="wallet-stat"><div class="lbl">Win Rate</div><div class="val" id="wWinRate">—</div></div>
+        <div class="wallet-stat"><div class="lbl">Started</div><div class="val" id="wStarted" style="font-size:13px">—</div></div>
+      </div>
+    </div>
+  </div>
 
-ALPACA_API_KEY     = “YOUR_ALPACA_API_KEY”       # Paper or live depending on mode
-ALPACA_SECRET_KEY  = “YOUR_ALPACA_SECRET_KEY”
-ALPACA_PAPER       = True                         # Set False for live trading
+  <!-- SETTINGS -->
 
-NEWS_API_KEY       = “YOUR_NEWSAPI_KEY”
+  <div class="section" id="sec-settings">
+    <div class="note"><strong>⚠️ Keep credentials private.</strong> Stored only on your device. Never share this screen.</div>
 
-GMAIL_ADDRESS      = “YOUR_GMAIL@gmail.com”
-GMAIL_APP_PASSWORD = “YOUR_16_CHAR_APP_PASSWORD”
+```
+<!-- Mode Toggle -->
+<div class="card">
+  <div class="card-label">Trading Mode</div>
+  <div class="mode-toggle-wrap">
+    <div class="mode-toggle-left">
+      <div class="mode-title" id="modeTitle">Paper Trading</div>
+      <div class="mode-sub" id="modeSub">Simulated — no real money</div>
+      <div class="mode-badge paper-badge" id="modeBadge">PAPER</div>
+    </div>
+    <div class="toggle-track paper" id="modeToggle" onclick="toggleMode()">
+      <div class="toggle-thumb"></div>
+    </div>
+  </div>
+  <div class="live-warning" id="liveWarning">⚠️ <strong>Live mode uses real money.</strong> Make sure your live Alpaca keys are entered below.</div>
+</div>
 
-PHONE_NUMBER       = “YOUR10DIGITNUMBER”
-VTEXT_ADDRESS      = f”{PHONE_NUMBER}@vtext.com”
+<!-- Quick Launch -->
+<div class="card">
+  <div class="card-label">Quick Launch</div>
+  <div class="quicklaunch-grid">
+    <a class="ql-btn" href="https://app.alpaca.markets" target="_blank">
+      <div class="ql-icon" style="background:rgba(255,255,255,.07)">📈</div>
+      <div class="ql-body"><div class="ql-name">Alpaca Markets</div><div class="ql-desc" id="alpacaQLDesc">Paper trading dashboard</div></div>
+      <div class="ql-arrow">›</div>
+    </a>
+    <a class="ql-btn" href="https://mail.google.com" target="_blank">
+      <div class="ql-icon" style="background:rgba(255,68,68,.12)">✉️</div>
+      <div class="ql-body"><div class="ql-name">Gmail</div><div class="ql-desc">Sends your SMS alerts</div></div>
+      <div class="ql-arrow">›</div>
+    </a>
+    <a class="ql-btn" href="https://newsapi.org/account" target="_blank">
+      <div class="ql-icon" style="background:rgba(0,136,255,.12)">📰</div>
+      <div class="ql-body"><div class="ql-name">NewsAPI</div><div class="ql-desc">Manage your API key</div></div>
+      <div class="ql-arrow">›</div>
+    </a>
+  </div>
+</div>
 
-STARTING_BALANCE   = 50.0
-MILESTONE_EVERY    = 100.0
-WITHDRAW_AT        = 1000.0
+<!-- Alpaca Keys — Paper + Live -->
+<div class="card">
+  <div class="card-label">Alpaca API Keys</div>
+  <div class="cred-form">
+    <div class="section-divider">📄 Paper Trading</div>
+    <div class="cred-group">
+      <label>Paper API Key</label>
+      <div class="input-wrap">
+        <input type="password" id="alpacaPaperKey" placeholder="PKTEST..." value="PK3DOD4PERBCE3XOT4J6MAAVKV"/>
+        <button class="eye-btn" onclick="toggleEye('alpacaPaperKey',this)">👁</button>
+      </div>
+    </div>
+    <div class="cred-group">
+      <label>Paper Secret Key</label>
+      <div class="input-wrap">
+        <input type="password" id="alpacaPaperSecret" placeholder="paper secret..." value="6gPo41jdodrnTdnpUKiXLnHB9TVzBL9nEFAxGc9GVEHU"/>
+        <button class="eye-btn" onclick="toggleEye('alpacaPaperSecret',this)">👁</button>
+      </div>
+    </div>
+    <div class="section-divider" style="margin-top:8px">🔴 Live Trading</div>
+    <div class="cred-group">
+      <label>Live API Key</label>
+      <div class="input-wrap">
+        <input type="password" id="alpacaLiveKey" placeholder="PKXXXXXXX..." value="AKOKP4ORECOVLA4TDN46EHW3T7"/>
+        <button class="eye-btn" onclick="toggleEye('alpacaLiveKey',this)">👁</button>
+      </div>
+    </div>
+    <div class="cred-group">
+      <label>Live Secret Key</label>
+      <div class="input-wrap">
+        <input type="password" id="alpacaLiveSecret" placeholder="live secret..." value="2o3j8oiwBcQ6hznhdWV6-JMJUa8R6gi7YghBtx8MR8r"/>
+        <button class="eye-btn" onclick="toggleEye('alpacaLiveSecret',this)">👁</button>
+      </div>
+    </div>
+  </div>
+</div>
 
-STOP_LOSS_PCT      = 0.03    # 3% stop-loss
-TAKE_PROFIT_PCT    = 0.08    # 8% take-profit
-MIN_SIGNAL_SCORE   = 3       # Minimum score to act on a signal
-MAX_POSITIONS      = 4
-TRADE_SIZE_PCT     = 0.20
-MAX_TRADE_USD      = 12.0
-COOLDOWN_CYCLES    = 2
-RED_DAY_THRESHOLD  = -0.01   # Don’t buy if SPY is down more than 1%
+<!-- NewsAPI -->
+<div class="card">
+  <div class="card-label">NewsAPI</div>
+  <div class="cred-form">
+    <div class="cred-group">
+      <label>API Key</label>
+      <div class="input-wrap">
+        <input type="password" id="newsKey" placeholder="news api key..." value="1fddfd387861474fb1e9e063b89645d9"/>
+        <button class="eye-btn" onclick="toggleEye('newsKey',this)">👁</button>
+      </div>
+    </div>
+  </div>
+</div>
 
-# Trusted news sources only
+<!-- SMS -->
+<div class="card">
+  <div class="card-label">SMS Alerts (Gmail → Verizon)</div>
+  <div class="cred-form">
+    <div class="cred-group"><label>Gmail Address</label><div class="input-wrap"><input type="email" id="gmailAddr" placeholder="you@gmail.com" value="justin.stocks.api@gmail.com"/></div></div>
+    <div class="cred-group">
+      <label>App Password</label>
+      <div class="input-wrap">
+        <input type="password" id="gmailPass" placeholder="16-char app password" value="vkhovfdztwkjuxue"/>
+        <button class="eye-btn" onclick="toggleEye('gmailPass',this)">👁</button>
+      </div>
+    </div>
+    <div class="cred-group"><label>Your Phone (10 digits)</label><div class="input-wrap"><input type="tel" id="phoneNum" placeholder="5551234567" maxlength="10" value="8167210604"/></div></div>
+  </div>
+</div>
 
-TRUSTED_SOURCES = {
-‘reuters.com’, ‘bloomberg.com’, ‘wsj.com’, ‘apnews.com’,
-‘cnbc.com’, ‘ft.com’, ‘marketwatch.com’, ‘finance.yahoo.com’,
-‘businessinsider.com’, ‘forbes.com’, ‘barrons.com’
+<!-- Bot Settings -->
+<div class="card">
+  <div class="card-label">Bot Settings</div>
+  <div class="cred-form">
+    <div class="cred-group"><label>Starting Amount ($)</label><div class="input-wrap"><input type="number" id="startAmt" value="50" min="10"/></div></div>
+    <div class="cred-group"><label>Milestone Every ($)</label><div class="input-wrap"><input type="number" id="milestoneAmt" value="100" min="10"/></div></div>
+    <div class="cred-group"><label>Withdraw At Profit ($)</label><div class="input-wrap"><input type="number" id="withdrawAmt" value="1000" min="100"/></div></div>
+  </div>
+</div>
+
+<button class="btn-save" onclick="saveSettings()">💾 Save Settings</button>
+```
+
+  </div>
+
+</main>
+
+<nav>
+  <div class="nav-item active" onclick="switchTab('dashboard',this)"><div class="nav-icon">📊</div>Dashboard</div>
+  <div class="nav-item" onclick="switchTab('activity',this)"><div class="nav-icon">📋</div>Activity</div>
+  <div class="nav-item" onclick="switchTab('wallet',this)"><div class="nav-icon">💼</div>Wallet</div>
+  <div class="nav-item" onclick="switchTab('settings',this)"><div class="nav-icon">⚙️</div>Settings</div>
+</nav>
+
+<div class="modal-overlay" id="restartModal">
+  <div class="modal">
+    <h2>🏆 Restart Bot</h2>
+    <p>Enter the amount for the next cycle.</p>
+    <input type="number" id="restartAmt" placeholder="$100" min="10"/>
+    <div class="modal-btns">
+      <button class="btn btn-cancel" onclick="closeRestartModal()">Cancel</button>
+      <button class="btn btn-confirm" onclick="confirmRestart()">Restart</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let botState='stopped',portfolio=50,startingBalance=50,profit=0;
+let milestoneEvery=100,withdrawAt=1000,lastMilestone=0;
+let totalTrades=0,wins=0,milestonesHit=0,startedAt=null,cycles=0;
+let pollInterval=null,activityLog=[],positions={};
+let isLiveMode=false,currentTransferType='deposit';
+let transfers=[];
+
+const MOCK_TICKERS=[
+  {sym:'AAPL',name:'Apple Inc.'},{sym:'NVDA',name:'NVIDIA Corp.'},
+  {sym:'MSFT',name:'Microsoft'},{sym:'SPY',name:'S&P 500 ETF'},
+  {sym:'TSLA',name:'Tesla Inc.'},{sym:'AMZN',name:'Amazon'},
+  {sym:'META',name:'Meta'},{sym:'XOM',name:'ExxonMobil'}
+];
+
+// ── Market hours ───────────────────────────────────
+function getMarketStatus(){
+  const now=new Date();
+  const et=new Date(now.toLocaleString('en-US',{timeZone:'America/New_York'}));
+  const day=et.getDay(),h=et.getHours(),m=et.getMinutes();
+  const mins=h*60+m;
+  if(day===0||day===6) return{status:'closed',label:'Market Closed — Weekend'};
+  if(mins>=570&&mins<690) return{status:'pre',label:'Pre-Market (9am–9:30am ET)'};
+  if(mins>=570&&mins<960) return{status:'open',label:'Market Open 🟢'};
+  if(mins>=960&&mins<1020) return{status:'pre',label:'After Hours (4pm–5pm ET)'};
+  return{status:'closed',label:'Market Closed'};
+}
+function updateMarketStatus(){
+  const ms=getMarketStatus();
+  const dot=document.getElementById('marketDot');
+  const txt=document.getElementById('marketStatusText');
+  dot.className='market-dot '+ms.status;
+  txt.textContent=ms.label;
 }
 
-ET = pytz.timezone(‘America/New_York’)
-
-# ─────────────────────────────────────────────
-
-# Logging
-
-# ─────────────────────────────────────────────
-
-logging.basicConfig(
-level=logging.INFO,
-format=”%(asctime)s [%(levelname)s] %(message)s”,
-handlers=[logging.FileHandler(“bot.log”), logging.StreamHandler()]
-)
-log = logging.getLogger(**name**)
-
-# ─────────────────────────────────────────────
-
-# Clients
-
-# ─────────────────────────────────────────────
-
-trading_client = TradingClient(ALPACA_API_KEY, ALPACA_SECRET_KEY, paper=ALPACA_PAPER)
-data_client    = StockHistoricalDataClient(ALPACA_API_KEY, ALPACA_SECRET_KEY)
-
-# ─────────────────────────────────────────────
-
-# Sentiment word lists with weights
-
-# ─────────────────────────────────────────────
-
-POSITIVE_WORDS = {
-“surge”:2,“soar”:2,“record”:2,“beat”:2,“blowout”:3,
-“profit”:1,“growth”:1,“gain”:1,“rally”:2,“boost”:1,
-“bullish”:2,“upgrade”:2,“buy”:1,“strong”:1,“rise”:1,
-“breakthrough”:2,“expansion”:1,“partnership”:1,“deal”:1,
-“outperform”:2,“exceed”:2,“innovation”:1,“demand”:1,
-}
-NEGATIVE_WORDS = {
-“crash”:3,“fall”:1,“loss”:2,“miss”:2,“drop”:1,
-“recession”:3,“bearish”:2,“downgrade”:2,“sell”:1,
-“weak”:1,“decline”:1,“layoff”:2,“bankrupt”:3,
-“risk”:1,“concern”:1,“warning”:2,“lawsuit”:2,
-“investigation”:2,“recall”:2,“tariff”:1,
-“fine”:1,“penalty”:2,“hack”:2,“breach”:2,
+// ── Tab switching ──────────────────────────────────
+function switchTab(name,el){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('sec-'+name).classList.add('active');
+  el.classList.add('active');
 }
 
-TICKER_KEYWORDS = {
-“apple”:“AAPL”,“iphone”:“AAPL”,
-“microsoft”:“MSFT”,“azure”:“MSFT”,
-“amazon”:“AMZN”,“aws”:“AMZN”,
-“google”:“GOOGL”,“alphabet”:“GOOGL”,
-“nvidia”:“NVDA”,“gpu”:“NVDA”,
-“meta”:“META”,“facebook”:“META”,“instagram”:“META”,
-“tesla”:“TSLA”,“elon”:“TSLA”,
-“netflix”:“NFLX”,“salesforce”:“CRM”,
-“jpmorgan”:“JPM”,“bank”:“JPM”,“goldman”:“GS”,
-“fed”:“SPY”,“federal reserve”:“SPY”,“interest rate”:“SPY”,
-“oil”:“XOM”,“exxon”:“XOM”,“energy”:“XOM”,“opec”:“XOM”,
-“pfizer”:“PFE”,“vaccine”:“PFE”,“drug”:“JNJ”,“fda”:“JNJ”,
-“economy”:“SPY”,“market”:“SPY”,“nasdaq”:“QQQ”,“tech”:“QQQ”,
-“recession”:“SPY”,“tariff”:“SPY”,“trade war”:“SPY”,
+// ── Bot controls ───────────────────────────────────
+function startBot(){
+  const ms=getMarketStatus();
+  if(ms.status==='closed'){
+    addActivity('alert','⏰ Market closed',ms.label+' — bot will trade when market opens');
+  }
+  botState='running';startedAt=startedAt||new Date();
+  updateStatusPill();showControls();
+  addActivity('info','▶ Bot started',`$${portfolio.toFixed(2)} | Stop-loss 3% | Take-profit 8%`);
+  pollInterval=setInterval(tick,8000);tick();
+}
+function pauseBot(){
+  botState='paused';clearInterval(pollInterval);updateStatusPill();
+  addActivity('alert','⏸ Bot paused','Resume anytime.');
+  document.getElementById('btnStart').textContent='▶ Resume Bot';
+  document.getElementById('btnStart').style.display='flex';
+  document.getElementById('btnPause').style.display='none';
+}
+function stopBot(){
+  botState='stopped';clearInterval(pollInterval);updateStatusPill();showControls();
+  addActivity('alert','⏹ Bot stopped',`Final: $${portfolio.toFixed(2)}`);
+}
+function updateStatusPill(){
+  document.getElementById('statusPill').className='status-pill '+botState;
+  document.getElementById('statusDot').className='dot'+(botState==='running'?' pulse':'');
+  document.getElementById('statusText').textContent=botState.charAt(0).toUpperCase()+botState.slice(1);
+}
+function showControls(){
+  const s=document.getElementById('btnStart'),p=document.getElementById('btnPause');
+  const x=document.getElementById('btnStop'),r=document.getElementById('btnRestart');
+  if(botState==='running'){s.style.display='none';p.style.display='flex';x.style.display='flex';r.style.display='none';}
+  else if(botState==='stopped'){s.style.display='flex';s.textContent='▶ Start Bot';p.style.display='none';x.style.display='none';r.style.display='none';}
 }
 
-# ─────────────────────────────────────────────
-
-# Market hours helpers
-
-# ─────────────────────────────────────────────
-
-def get_et_time():
-return datetime.now(ET)
-
-def is_market_open() -> bool:
-now = get_et_time()
-if now.weekday() >= 5:
-return False
-market_open  = now.replace(hour=9, minute=30, second=0, microsecond=0)
-market_close = now.replace(hour=16, minute=0,  second=0, microsecond=0)
-return market_open <= now < market_close
-
-def is_premarket() -> bool:
-now = get_et_time()
-if now.weekday() >= 5:
-return False
-pre_open   = now.replace(hour=9,  minute=0,  second=0, microsecond=0)
-market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
-return pre_open <= now < market_open
-
-def seconds_until_open() -> int:
-now = get_et_time()
-market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
-if now >= market_open:
-# Next day
-from datetime import timedelta
-market_open += timedelta(days=1)
-while market_open.weekday() >= 5:
-market_open += timedelta(days=1)
-return max(0, int((market_open - now).total_seconds()))
-
-# ─────────────────────────────────────────────
-
-# Red day protection — check SPY trend
-
-# ─────────────────────────────────────────────
-
-def is_red_day() -> bool:
-“”“Returns True if SPY is down more than RED_DAY_THRESHOLD today.”””
-try:
-from alpaca.data.requests import StockBarsRequest
-from alpaca.data.timeframe import TimeFrame
-from datetime import date, timedelta
-req = StockBarsRequest(
-symbol_or_symbols=“SPY”,
-timeframe=TimeFrame.Day,
-start=date.today() - timedelta(days=2),
-end=date.today()
-)
-bars = data_client.get_stock_bars(req)[“SPY”]
-if len(bars) >= 2:
-prev_close = bars[-2].close
-curr_close = bars[-1].close
-change_pct = (curr_close - prev_close) / prev_close
-log.info(f”SPY day change: {change_pct*100:.2f}%”)
-return change_pct < RED_DAY_THRESHOLD
-except Exception as e:
-log.warning(f”Could not check red day: {e}”)
-return False
-
-# ─────────────────────────────────────────────
-
-# SMS
-
-# ─────────────────────────────────────────────
-
-def send_sms(message: str):
-try:
-msg = MIMEText(message)
-msg[“From”] = GMAIL_ADDRESS
-msg[“To”]   = VTEXT_ADDRESS
-msg[“Subject”] = “”
-with smtplib.SMTP_SSL(“smtp.gmail.com”, 465) as server:
-server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
-server.sendmail(GMAIL_ADDRESS, VTEXT_ADDRESS, msg.as_string())
-log.info(f”SMS sent: {message}”)
-except Exception as e:
-log.error(f”SMS failed: {e}”)
-
-# ─────────────────────────────────────────────
-
-# News signal scoring
-
-# ─────────────────────────────────────────────
-
-def is_trusted_source(url: str) -> bool:
-if not url:
-return False
-return any(domain in url for domain in TRUSTED_SOURCES)
-
-def get_news_signals():
-url = (
-f”https://newsapi.org/v2/top-headlines”
-f”?category=business&language=en&pageSize=30&apiKey={NEWS_API_KEY}”
-)
-try:
-resp     = requests.get(url, timeout=10)
-articles = resp.json().get(“articles”, [])
-except Exception as e:
-log.error(f”News fetch failed: {e}”)
-return []
-
-```
-ticker_scores  = {}
-ticker_reasons = {}
-trusted_count  = 0
-
-for article in articles:
-    source_url = article.get("url", "")
-    # Filter to trusted sources only
-    if not is_trusted_source(source_url):
-        continue
-    trusted_count += 1
-
-    title = (article.get("title") or "").lower()
-    desc  = (article.get("description") or "").lower()
-    text  = title + " " + desc
-
-    matched = {}
-    for keyword, sym in TICKER_KEYWORDS.items():
-        if keyword in text:
-            matched[sym] = matched.get(sym, 0) + 1
-
-    if not matched:
-        continue
-
-    score = 0
-    for word, weight in POSITIVE_WORDS.items():
-        if word in text: score += weight
-    for word, weight in NEGATIVE_WORDS.items():
-        if word in text: score -= weight
-
-    if score == 0:
-        continue
-
-    for sym in matched:
-        contribution = min(abs(score), 3) * (1 if score > 0 else -1)
-        ticker_scores[sym] = ticker_scores.get(sym, 0) + contribution
-        if sym not in ticker_reasons:
-            ticker_reasons[sym] = article.get("title", "")
-
-log.info(f"Processed {trusted_count} trusted articles")
-
-signals = []
-for sym, total_score in ticker_scores.items():
-    # Minimum signal strength filter
-    if abs(total_score) >= MIN_SIGNAL_SCORE:
-        sentiment = "BUY" if total_score > 0 else "SELL"
-        signals.append((sym, sentiment, total_score, ticker_reasons.get(sym, "")))
-        log.info(f"Signal: {sentiment:4} {sym:6} score={total_score:+d}")
-    else:
-        log.info(f"Filtered: {sym} score={total_score:+d} (below min {MIN_SIGNAL_SCORE})")
-
-signals.sort(key=lambda x: abs(x[2]), reverse=True)
-return signals
-```
-
-# ─────────────────────────────────────────────
-
-# Alpaca helpers
-
-# ─────────────────────────────────────────────
-
-def get_account():
-return trading_client.get_account()
-
-def get_portfolio_value():
-return float(get_account().portfolio_value)
-
-def get_current_price(ticker: str) -> float:
-req   = StockLatestQuoteRequest(symbol_or_symbols=ticker)
-quote = data_client.get_stock_latest_quote(req)
-return float(quote[ticker].ask_price)
-
-def get_all_positions() -> dict:
-try:
-return {p.symbol: p for p in trading_client.get_all_positions()}
-except Exception as e:
-log.error(f”Error fetching positions: {e}”)
-return {}
-
-def place_order(ticker: str, side: OrderSide, dollars: float):
-try:
-price = get_current_price(ticker)
-qty   = round(dollars / price, 6)
-if qty < 0.001:
-log.info(f”Order too small for {ticker}”)
-return None
-req   = MarketOrderRequest(
-symbol=ticker, qty=qty,
-side=side, time_in_force=TimeInForce.DAY
-)
-order = trading_client.submit_order(req)
-log.info(f”Order: {side.value.upper()} {qty:.4f} {ticker} @ ~${price:.2f}”)
-return order
-except Exception as e:
-log.error(f”Order failed {ticker}: {e}”)
-return None
-
-def close_position(ticker: str):
-try:
-trading_client.close_position(ticker)
-log.info(f”Closed: {ticker}”)
-except Exception as e:
-log.error(f”Could not close {ticker}: {e}”)
-
-# ─────────────────────────────────────────────
-
-# Stop-loss + Take-profit checker
-
-# ─────────────────────────────────────────────
-
-def check_exit_conditions(positions: dict) -> list:
-“””
-Check all open positions for:
-- Stop-loss: close if down 3% from entry
-- Take-profit: close if up 8% from entry
-“””
-closed = []
-for sym, pos in positions.items():
-try:
-avg_entry  = float(pos.avg_entry_price)
-curr_price = float(pos.current_price)
-change_pct = (curr_price - avg_entry) / avg_entry
-
-```
-        if change_pct <= -STOP_LOSS_PCT:
-            log.warning(f"STOP-LOSS {sym}: {change_pct*100:.1f}%")
-            close_position(sym)
-            closed.append(sym)
-            send_sms(f"Stop-loss: {sym} ({change_pct*100:.1f}%). Closed.")
-
-        elif change_pct >= TAKE_PROFIT_PCT:
-            log.info(f"TAKE-PROFIT {sym}: +{change_pct*100:.1f}%")
-            close_position(sym)
-            closed.append(sym)
-            send_sms(f"Take-profit hit: {sym} (+{change_pct*100:.1f}%). Gains locked in!")
-
-    except Exception as e:
-        log.error(f"Exit check error {sym}: {e}")
-return closed
-```
-
-# ─────────────────────────────────────────────
-
-# Main bot loop
-
-# ─────────────────────────────────────────────
-
-def run_bot(starting_balance: float):
-log.info(
-f”Bot v3 started | ${starting_balance:.2f} | “
-f”Stop: {STOP_LOSS_PCT*100:.0f}% | Take-profit: {TAKE_PROFIT_PCT*100:.0f}% | “
-f”Min signal: {MIN_SIGNAL_SCORE}”
-)
-send_sms(
-f”Bot v3 started: ${starting_balance:.2f}. “
-f”3% stop-loss, 8% take-profit, trusted sources only.”
-)
-
-```
-last_milestone   = 0.0
-cooldown_map     = {}
-cycle            = 0
-premarket_scanned = False
-
-while True:
-    try:
-        cycle += 1
-        now_et = get_et_time()
-        log.info(f"\n--- Cycle {cycle} | {now_et.strftime('%a %H:%M ET')} ---")
-
-        # Tick down cooldowns
-        cooldown_map = {k: v-1 for k, v in cooldown_map.items() if v > 1}
-
-        # ── Pre-market scan at 9am ──
-        if is_premarket() and not premarket_scanned:
-            log.info("Pre-market: scanning news, preparing signals for open...")
-            signals = get_news_signals()
-            log.info(f"Pre-market signals ready: {[(s[0],s[1]) for s in signals[:5]]}")
-            premarket_scanned = True
-            send_sms(f"Pre-market scan done. {len(signals)} signals ready for 9:30 open.")
-            time.sleep(60)
-            continue
-
-        # Reset premarket flag each day after market opens
-        if is_market_open():
-            premarket_scanned = False
-
-        # ── Outside market hours — sleep until open ──
-        if not is_market_open():
-            secs = seconds_until_open()
-            hrs  = secs // 3600
-            mins = (secs % 3600) // 60
-            log.info(f"Market closed. Next open in {hrs}h {mins}m. Sleeping...")
-            # Check positions and portfolio even when closed
-            portfolio_value = get_portfolio_value()
-            profit = portfolio_value - starting_balance
-            log.info(f"Portfolio: ${portfolio_value:.2f} | Profit: ${profit:+.2f}")
-            # Sleep in 5-min chunks so we can check for stop-loss hits in after-hours
-            time.sleep(min(300, secs))
-            continue
-
-        # ── Market is open ──
-        portfolio_value = get_portfolio_value()
-        profit          = portfolio_value - starting_balance
-        log.info(f"Portfolio: ${portfolio_value:.2f} | Profit: ${profit:+.2f}")
-
-        # Withdraw threshold
-        if profit >= WITHDRAW_AT:
-            send_sms(
-                f"Bot hit ${WITHDRAW_AT:.0f} profit! "
-                f"Portfolio: ${portfolio_value:.2f}. "
-                f"Paused — reply with new amount."
-            )
-            for sym in get_all_positions():
-                close_position(sym)
-            log.info("Withdraw threshold hit. Bot stopped.")
-            break
-
-        # Milestone alerts
-        if profit > 0:
-            milestone_hit = int(profit / MILESTONE_EVERY) * MILESTONE_EVERY
-            if milestone_hit > last_milestone:
-                send_sms(f"+${milestone_hit:.0f} milestone! Portfolio: ${portfolio_value:.2f}")
-                last_milestone = milestone_hit
-
-        # Stop-loss + take-profit check
-        positions = get_all_positions()
-        closed    = check_exit_conditions(positions)
-        for sym in closed:
-            cooldown_map[sym] = COOLDOWN_CYCLES
-
-        # Red day protection
-        red_day = is_red_day()
-        if red_day:
-            log.info("Red day detected (SPY down 1%+). Skipping new buys.")
-
-        # Refresh positions
-        positions = get_all_positions()
-
-        # Get signals
-        signals = get_news_signals()
-        if not signals:
-            log.info("No signals above minimum threshold this cycle.")
-        else:
-            account      = get_account()
-            buying_power = float(account.buying_power)
-            trade_size   = min(buying_power * TRADE_SIZE_PCT, MAX_TRADE_USD)
-            buys_made    = 0
-            max_new_buys = MAX_POSITIONS - len(positions)
-
-            for ticker, sentiment, score, headline in signals:
-                if ticker in cooldown_map:
-                    log.info(f"Cooldown: {ticker}")
-                    continue
-
-                if sentiment == "BUY":
-                    if red_day:
-                        log.info(f"Skipping BUY {ticker} — red day protection")
-                        continue
-                    if buys_made >= max_new_buys or ticker in positions or trade_size < 1.0:
-                        continue
-                    result = place_order(ticker, OrderSide.BUY, trade_size)
-                    if result:
-                        buys_made += 1
-                        cooldown_map[ticker] = COOLDOWN_CYCLES
-                        log.info(f"Buy: {ticker} score={score:+d} | {headline[:60]}")
-
-                elif sentiment == "SELL":
-                    if ticker in positions:
-                        close_position(ticker)
-                        cooldown_map[ticker] = COOLDOWN_CYCLES
-                        log.info(f"Sell: {ticker} score={score:+d} | {headline[:60]}")
-
-        log.info(f"Sleeping 15 min | Cooldowns: {list(cooldown_map.keys())}")
-        time.sleep(15 * 60)
-
-    except KeyboardInterrupt:
-        log.info("Bot manually stopped.")
-        send_sms("Bot manually stopped.")
-        break
-    except Exception as e:
-        log.error(f"Unexpected error: {e}")
-        time.sleep(60)
-```
+// ── Simulate tick ──────────────────────────────────
+function tick(){
+  updateMarketStatus();
+  const ms=getMarketStatus();
+  // Only simulate trades during market/pre-market hours
+  const canTrade=(ms.status==='open'||ms.status==='pre');
+  const change=(Math.random()-0.42)*1.5;
+  portfolio=Math.max(startingBalance*0.7,portfolio+change);
+  profit=portfolio-startingBalance;
+
+  if(canTrade&&Math.random()<0.35){
+    const t=MOCK_TICKERS[Math.floor(Math.random()*MOCK_TICKERS.length)];
+    const isBuy=Math.random()>0.45,amt=(Math.random()*8+2).toFixed(2),win=Math.random()>0.45;
+    const signalScore=Math.floor(Math.random()*5)+3; // simulate min score 3
+    totalTrades++;if(win)wins++;
+    if(isBuy){
+      positions[t.sym]={val:(positions[t.sym]?.val||0)+parseFloat(amt),entry:portfolio};
+      addActivity('buy',`BUY ${t.sym}`,`$${amt} · Signal strength: +${signalScore}`);
+    } else {
+      if(positions[t.sym]){
+        const pnl=((Math.random()-.3)*10).toFixed(2);
+        const hitStop=parseFloat(pnl)<-STOP_LOSS_SIM;
+        const hitProfit=parseFloat(pnl)>TAKE_PROFIT_SIM;
+        delete positions[t.sym];
+        if(hitStop) addActivity('sell',`STOP-LOSS ${t.sym}`,`-3% threshold hit. Position closed.`);
+        else if(hitProfit) addActivity('sell',`TAKE-PROFIT ${t.sym}`,`+8% target hit! Locking in gains.`);
+        else addActivity('sell',`SELL ${t.sym}`,`Closed · ${win?'✅ Profit':'🔻 Loss'} ($${pnl})`);
+      }
+    }
+    renderPositions();
+  } else if(!canTrade&&Math.random()<0.05){
+    addActivity('info','⏰ Market closed',ms.label+' — watching news, ready for open');
+  }
+
+  if(profit>0){
+    const hit=Math.floor(profit/milestoneEvery)*milestoneEvery;
+    if(hit>lastMilestone){lastMilestone=hit;milestonesHit++;addActivity('alert',`💰 $${hit.toFixed(0)} milestone!`,`Portfolio: $${portfolio.toFixed(2)}`);}
+  }
+  if(profit>=withdrawAt){
+    clearInterval(pollInterval);botState='stopped';updateStatusPill();cycles++;
+    document.getElementById('btnStart').style.display='none';
+    document.getElementById('btnPause').style.display='none';
+    document.getElementById('btnStop').style.display='none';
+    document.getElementById('btnRestart').style.display='flex';
+    addActivity('alert',`🏆 $${withdrawAt} profit reached!`,'Bot paused. Set new amount to restart.');
+  }
+  updateUI();
+}
+
+const STOP_LOSS_SIM=1.5;   // simulate 3% stop
+const TAKE_PROFIT_SIM=4;   // simulate 8% take-profit
+
+// ── UI update ──────────────────────────────────────
+function updateUI(){
+  const pct=Math.min((profit/withdrawAt)*100,100),isPos=profit>=0;
+  document.getElementById('portfolioVal').textContent=`$${portfolio.toFixed(2)}`;
+  const badge=document.getElementById('profitBadge');
+  badge.textContent=(isPos?'+':'')+`$${profit.toFixed(2)}`;
+  badge.className='profit-badge'+(isPos?'':' neg');
+  const pctChange=((portfolio-startingBalance)/startingBalance*100).toFixed(2);
+  document.getElementById('profitPct').textContent=(pctChange>=0?'+':'')+pctChange+'% total';
+  document.getElementById('progressFill').style.width=pct+'%';
+  const nextM=Math.ceil((profit+0.01)/milestoneEvery)*milestoneEvery;
+  document.getElementById('nextMilestoneLabel').textContent=profit>=withdrawAt?'Withdraw reached!':`Next: $${nextM}`;
+  const invested=Object.values(positions).reduce((a,b)=>a+(b.val||0),0);
+  const cash=Math.max(0,portfolio-invested);
+  document.getElementById('statBuyingPower').textContent=`$${cash.toFixed(2)}`;
+  document.getElementById('statPositions').textContent=Object.keys(positions).length;
+  document.getElementById('statTrades').textContent=totalTrades;
+  document.getElementById('wPortfolio').textContent=`$${portfolio.toFixed(2)}`;
+  document.getElementById('wCash').textContent=`$${cash.toFixed(2)}`;
+  document.getElementById('wProfit').textContent=(isPos?'+':'')+`$${profit.toFixed(2)}`;
+  document.getElementById('wInvested').textContent=`$${invested.toFixed(2)}`;
+  document.getElementById('wMilestones').textContent=milestonesHit;
+  document.getElementById('wTrades').textContent=totalTrades;
+  document.getElementById('wWinRate').textContent=totalTrades>0?Math.round(wins/totalTrades*100)+'%':'—';
+  document.getElementById('wStarted').textContent=startedAt?startedAt.toLocaleDateString():'—';
+  document.getElementById('wCycles').textContent=cycles;
+  const totalDep=transfers.filter(t=>t.type==='deposit').reduce((a,t)=>a+t.amount,0);
+  const totalWit=transfers.filter(t=>t.type==='withdraw').reduce((a,t)=>a+t.amount,0);
+  const netProfit=portfolio-totalDep+totalWit;
+  document.getElementById('wTotalDeposited').textContent=`$${totalDep.toFixed(2)}`;
+  document.getElementById('wTotalWithdrawn').textContent=`$${totalWit.toFixed(2)}`;
+  document.getElementById('wNetProfit').textContent=(netProfit>=0?'+':'')+`$${netProfit.toFixed(2)}`;
+}
+function renderPositions(){
+  const el=document.getElementById('positionsList'),keys=Object.keys(positions);
+  if(!keys.length){el.innerHTML='<div class="empty-state">No open positions</div>';return;}
+  el.innerHTML=keys.map(sym=>{
+    const val=positions[sym].val||0;
+    const change=((Math.random()-.45)*3).toFixed(2),isUp=change>=0;
+    const ticker=MOCK_TICKERS.find(t=>t.sym===sym)||{name:sym};
+    return`<div class="position-row"><div><div class="pos-ticker">${sym}</div><div class="pos-name">${ticker.name}</div></div><div class="pos-right"><div class="pos-val">$${val.toFixed(2)}</div><div class="pos-change ${isUp?'up':'dn'}">${isUp?'+':''}${change}%</div></div></div>`;
+  }).join('');
+}
+function addActivity(type,title,meta){
+  const icons={buy:'📈',sell:'📉',alert:'🔔',info:'ℹ️'};
+  activityLog.unshift({type,icon:icons[type]||'ℹ️',title,meta,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+  if(activityLog.length>50)activityLog.pop();
+  renderActivity();
+}
+function renderActivity(){
+  const el=document.getElementById('activityFeed');
+  if(!activityLog.length){el.innerHTML='<div class="empty-state">No activity yet. Start the bot to begin.</div>';return;}
+  el.innerHTML=activityLog.slice(0,20).map(a=>`<div class="activity-item"><div class="activity-icon icon-${a.type}">${a.icon}</div><div class="activity-body"><div class="activity-title">${a.title}</div><div class="activity-meta">${a.meta} · ${a.time}</div></div></div>`).join('');
+}
+function openRestartModal(){document.getElementById('restartModal').classList.add('open');}
+function closeRestartModal(){document.getElementById('restartModal').classList.remove('open');}
+function confirmRestart(){
+  const val=parseFloat(document.getElementById('restartAmt').value);
+  if(!val||val<10){alert('Enter at least $10');return;}
+  closeRestartModal();portfolio=val;startingBalance=val;profit=0;lastMilestone=0;positions={};
+  renderPositions();updateUI();
+  document.getElementById('btnRestart').style.display='none';
+  startBot();addActivity('info',`↺ Restarted with $${val}`,'New cycle begun');
+}
+
+// ── Transfers ──────────────────────────────────────
+function setTransferType(type){
+  currentTransferType=type;
+  document.getElementById('tTypeDeposit').className='transfer-type-btn'+(type==='deposit'?' active':'');
+  document.getElementById('tTypeWithdraw').className='transfer-type-btn withdraw'+(type==='withdraw'?' active':'');
+}
+function logTransfer(){
+  const amt=parseFloat(document.getElementById('transferAmt').value);
+  const note=document.getElementById('transferNote').value||(currentTransferType==='deposit'?'Deposit':'Withdrawal');
+  if(!amt||amt<=0){alert('Enter a valid amount');return;}
+  transfers.unshift({type:currentTransferType,amount:amt,note,date:new Date().toLocaleDateString()});
+  saveTransfers();
+  document.getElementById('transferAmt').value='';
+  document.getElementById('transferNote').value='';
+  renderTransfers();updateUI();
+  alert(`✅ ${currentTransferType==='deposit'?'Deposit':'Withdrawal'} of $${amt.toFixed(2)} logged!`);
+}
+function renderTransfers(){
+  const el=document.getElementById('transferHistory');
+  if(!transfers.length){el.innerHTML='<div class="empty-state">No transfers logged yet.</div>';return;}
+  el.innerHTML=transfers.map(t=>`<div class="transfer-row"><div class="transfer-left"><div class="transfer-icon" style="background:${t.type==='deposit'?'rgba(0,255,136,.12)':'rgba(255,68,102,.12)'}">${t.type==='deposit'?'💵':'🏦'}</div><div><div class="transfer-note">${t.note}</div><div class="transfer-date">${t.date}</div></div></div><div class="transfer-amount ${t.type==='deposit'?'dep':'wit'}">${t.type==='deposit'?'+':'-'}$${t.amount.toFixed(2)}</div></div>`).join('');
+}
+function saveTransfers(){try{localStorage.setItem('transfers',JSON.stringify(transfers));}catch(e){}}
+function loadTransfers(){try{const d=localStorage.getItem('transfers');if(d)transfers=JSON.parse(d);}catch(e){}renderTransfers();}
+
+// ── Show/hide password fields ──────────────────────
+function toggleEye(inputId,btn){
+  const inp=document.getElementById(inputId);
+  const isHidden=inp.type==='password';
+  inp.type=isHidden?'text':'password';
+  btn.textContent=isHidden?'🙈':'👁';
+}
+
+// ── Paper / Live toggle ────────────────────────────
+function toggleMode(){
+  if(!isLiveMode){const ok=confirm('⚠️ Switch to LIVE trading?\n\nThis uses real money. Make sure your live Alpaca keys are saved.');if(!ok)return;}
+  isLiveMode=!isLiveMode;
+  localStorage.setItem('isLiveMode',isLiveMode?'1':'0');
+  applyModeUI();
+}
+function applyModeUI(){
+  const live=isLiveMode;
+  document.getElementById('modeToggle').className='toggle-track '+(live?'live':'paper');
+  document.getElementById('modeTitle').textContent=live?'Live Trading':'Paper Trading';
+  document.getElementById('modeSub').textContent=live?'Real money — trade carefully':'Simulated — no real money';
+  document.getElementById('modeBadge').textContent=live?'LIVE':'PAPER';
+  document.getElementById('modeBadge').className='mode-badge '+(live?'live-badge':'paper-badge');
+  document.getElementById('liveWarning').className='live-warning'+(live?' show':'');
+  document.getElementById('alpacaQLDesc').textContent=live?'Live trading dashboard':'Paper trading dashboard';
+  document.getElementById('logoEl').style.color=live?'var(--danger)':'var(--accent)';
+}
+
+// ── Settings ───────────────────────────────────────
+function saveSettings(){
+  // Save all keys — both paper and live stored separately
+  const paperKeys={alpacaPaperKey:'alpacaKey_paper',alpacaPaperSecret:'alpacaSecret_paper'};
+  const liveKeys={alpacaLiveKey:'alpacaKey_live',alpacaLiveSecret:'alpacaSecret_live'};
+  const sharedKeys={newsKey:'newsKey',gmailAddr:'gmailAddr',gmailPass:'gmailPass',phoneNum:'phoneNum'};
+  Object.entries({...paperKeys,...liveKeys,...sharedKeys}).forEach(([elId,storeKey])=>{
+    const v=document.getElementById(elId)?.value;
+    if(v)localStorage.setItem(storeKey,v);
+  });
+  startingBalance=parseFloat(document.getElementById('startAmt').value)||50;
+  milestoneEvery=parseFloat(document.getElementById('milestoneAmt').value)||100;
+  withdrawAt=parseFloat(document.getElementById('withdrawAmt').value)||1000;
+  portfolio=startingBalance;
+  localStorage.setItem('startAmt',startingBalance);
+  localStorage.setItem('milestoneAmt',milestoneEvery);
+  localStorage.setItem('withdrawAt',withdrawAt);
+  updateUI();
+  alert('✅ Settings saved! Both paper and live keys stored separately.');
+}
+function loadSettings(){
+  isLiveMode=localStorage.getItem('isLiveMode')==='1';
+  applyModeUI();
+  const fieldMap={
+    alpacaPaperKey:'alpacaKey_paper',alpacaPaperSecret:'alpacaSecret_paper',
+    alpacaLiveKey:'alpacaKey_live',alpacaLiveSecret:'alpacaSecret_live',
+    newsKey:'newsKey',gmailAddr:'gmailAddr',gmailPass:'gmailPass',phoneNum:'phoneNum'
+  };
+  Object.entries(fieldMap).forEach(([elId,storeKey])=>{
+    const v=localStorage.getItem(storeKey);
+    if(v&&document.getElementById(elId))document.getElementById(elId).value=v;
+  });
+  startingBalance=parseFloat(localStorage.getItem('startAmt'))||50;
+  milestoneEvery=parseFloat(localStorage.getItem('milestoneAmt'))||100;
+  withdrawAt=parseFloat(localStorage.getItem('withdrawAt'))||1000;
+  document.getElementById('startAmt').value=startingBalance;
+  document.getElementById('milestoneAmt').value=milestoneEvery;
+  document.getElementById('withdrawAmt').value=withdrawAt;
+  portfolio=startingBalance;
+}
+
+loadSettings();loadTransfers();updateMarketStatus();updateUI();renderActivity();
+setInterval(updateMarketStatus,60000);
+</script>
+
+</body>
+</html>
