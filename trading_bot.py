@@ -173,7 +173,7 @@ return max(0, int((market_open - now).total_seconds()))
 
 # ─────────────────────────────────────────────
 
-# Red day protection — check SPY trend
+# Red day protection - check SPY trend
 
 # ─────────────────────────────────────────────
 
@@ -429,7 +429,7 @@ while True:
         if is_market_open():
             premarket_scanned = False
 
-        # ── Outside market hours — sleep until open ──
+        # ── Outside market hours - sleep until open ──
         if not is_market_open():
             secs = seconds_until_open()
             hrs  = secs // 3600
@@ -453,7 +453,7 @@ while True:
             send_sms(
                 f"Bot hit ${WITHDRAW_AT:.0f} profit! "
                 f"Portfolio: ${portfolio_value:.2f}. "
-                f"Paused — reply with new amount."
+                f"Paused - reply with new amount."
             )
             for sym in get_all_positions():
                 close_position(sym)
@@ -499,7 +499,7 @@ while True:
 
                 if sentiment == "BUY":
                     if red_day:
-                        log.info(f"Skipping BUY {ticker} — red day protection")
+                        log.info(f"Skipping BUY {ticker} - red day protection")
                         continue
                     if buys_made >= max_new_buys or ticker in positions or trade_size < 1.0:
                         continue
