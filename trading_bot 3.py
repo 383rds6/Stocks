@@ -1,0 +1,361 @@
+import time
+import os
+import smtplib
+import logging
+import requests
+from email.mime.text import MIMEText
+from datetime import datetime
+import pytz
+
+from alpaca.trading.client import TradingClient
+from alpaca.trading.requests import MarketOrderRequest
+from alpaca.trading.enums import OrderSide, TimeInForce
+from alpaca.data.historical import StockHistoricalDataClient
+from alpaca.data.requests import StockLatestQuoteRequest, StockBarsRequest
+from alpaca.data.timeframe import TimeFrame
+
+ALPACA_API_KEY     = os.environ.get("ALPACA_API_KEY",     "AKOKP4ORECOVLA4TDN46EHW3T7")
+ALPACA_SECRET_KEY  = os.environ.get("ALPACA_SECRET_KEY",  "2o3j8oiwBcQ6hznhdWV6-JMJUa8R6gi7YghBtx8MR8r")
+
+NEWS_API_KEY       = os.environ.get("NEWS_API_KEY",       "1fddfd387861474fb1e9e063b89645d9")
+GMAIL_ADDRESS      = os.environ.get("GMAIL_ADDRESS",      "justin.stocks.api@gmail.com")
+GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "vkhovfdztwkjuxue")
+PHONE_NUMBER       = os.environ.get("PHONE_NUMBER",       "8167210604")
+VTEXT_ADDRESS      = PHONE_NUMBER + "@vtext.com"
+
+STARTING_BALANCE   = 50.0
+MILESTONE_EVERY    = 100.0
+WITHDRAW_AT        = 1000.0
+STOP_LOSS_PCT      = 0.03
+TAKE_PROFIT_PCT    = 0.08
+MIN_SIGNAL_SCORE   = 3
+MAX_POSITIONS      = 4
+TRADE_SIZE_PCT     = 0.20
+MAX_TRADE_USD      = 12.0
+COOLDOWN_CYCLES    = 2
+RED_DAY_THRESHOLD  = -0.01
+
+TRUSTED_SOURCES = {
+    'reuters.com', 'bloomberg.com', 'wsj.com', 'apnews.com',
+    'cnbc.com', 'ft.com', 'marketwatch.com', 'finance.yahoo.com',
+    'businessinsider.com', 'forbes.com', 'barrons.com'
+}
+
+ET = pytz.timezone('America/New_York')
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.FileHandler("bot.log"), logging.StreamHandler()]
+)
+log = logging.getLogger(__name__)
+
+trading_client = TradingClient(ALPACA_API_KEY, ALPACA_SECRET_KEY, paper=False)
+data_client    = StockHistoricalDataClient(ALPACA_API_KEY, ALPACA_SECRET_KEY)
+
+POSITIVE_WORDS = {
+    "surge":2,"soar":2,"record":2,"beat":2,"blowout":3,
+    "profit":1,"growth":1,"gain":1,"rally":2,"boost":1,
+    "bullish":2,"upgrade":2,"buy":1,"strong":1,"rise":1,
+    "breakthrough":2,"expansion":1,"partnership":1,"deal":1,
+    "outperform":2,"exceed":2,"innovation":1,"demand":1,
+}
+NEGATIVE_WORDS = {
+    "crash":3,"fall":1,"loss":2,"miss":2,"drop":1,
+    "recession":3,"bearish":2,"downgrade":2,"sell":1,
+    "weak":1,"decline":1,"layoff":2,"bankrupt":3,
+    "risk":1,"concern":1,"warning":2,"lawsuit":2,
+    "investigation":2,"recall":2,"tariff":1,
+    "fine":1,"penalty":2,"hack":2,"breach":2,
+}
+TICKER_KEYWORDS = {
+    "apple":"AAPL","iphone":"AAPL",
+    "microsoft":"MSFT","azure":"MSFT",
+    "amazon":"AMZN","aws":"AMZN",
+    "google":"GOOGL","alphabet":"GOOGL",
+    "nvidia":"NVDA","gpu":"NVDA",
+    "meta":"META","facebook":"META","instagram":"META",
+    "tesla":"TSLA","elon":"TSLA",
+    "netflix":"NFLX","salesforce":"CRM",
+    "jpmorgan":"JPM","bank":"JPM","goldman":"GS",
+    "fed":"SPY","federal reserve":"SPY","interest rate":"SPY",
+    "oil":"XOM","exxon":"XOM","energy":"XOM","opec":"XOM",
+    "pfizer":"PFE","vaccine":"PFE","drug":"JNJ","fda":"JNJ",
+    "economy":"SPY","market":"SPY","nasdaq":"QQQ","tech":"QQQ",
+    "recession":"SPY","tariff":"SPY","trade war":"SPY",
+}
+
+def get_et_time():
+    return datetime.now(ET)
+
+def is_market_open():
+    now = get_et_time()
+    if now.weekday() >= 5:
+        return False
+    mins = now.hour * 60 + now.minute
+    return 570 <= mins < 960
+
+def is_premarket():
+    now = get_et_time()
+    if now.weekday() >= 5:
+        return False
+    mins = now.hour * 60 + now.minute
+    return 540 <= mins < 570
+
+def seconds_until_open():
+    from datetime import timedelta
+    now = get_et_time()
+    market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
+    if now >= market_open:
+        market_open += timedelta(days=1)
+        while market_open.weekday() >= 5:
+            market_open += timedelta(days=1)
+    return max(0, int((market_open - now).total_seconds()))
+
+def is_red_day():
+    try:
+        from datetime import date, timedelta
+        req = StockBarsRequest(
+            symbol_or_symbols="SPY",
+            timeframe=TimeFrame.Day,
+            start=date.today() - timedelta(days=2),
+            end=date.today()
+        )
+        bars = data_client.get_stock_bars(req)["SPY"]
+        if len(bars) >= 2:
+            change = (bars[-1].close - bars[-2].close) / bars[-2].close
+            log.info("SPY change: %.2f%%" % (change * 100))
+            return change < RED_DAY_THRESHOLD
+    except Exception as e:
+        log.warning("Red day check failed: %s" % e)
+    return False
+
+def send_sms(message):
+    try:
+        msg = MIMEText(message)
+        msg["From"]    = GMAIL_ADDRESS
+        msg["To"]      = VTEXT_ADDRESS
+        msg["Subject"] = ""
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
+            server.sendmail(GMAIL_ADDRESS, VTEXT_ADDRESS, msg.as_string())
+        log.info("SMS sent: %s" % message)
+    except Exception as e:
+        log.error("SMS failed: %s" % e)
+
+def is_trusted_source(url):
+    if not url:
+        return False
+    return any(domain in url for domain in TRUSTED_SOURCES)
+
+def get_news_signals():
+    url = ("https://newsapi.org/v2/top-headlines"
+           "?category=business&language=en&pageSize=30&apiKey=%s" % NEWS_API_KEY)
+    try:
+        resp     = requests.get(url, timeout=10)
+        articles = resp.json().get("articles", [])
+    except Exception as e:
+        log.error("News fetch failed: %s" % e)
+        return []
+
+    ticker_scores  = {}
+    ticker_reasons = {}
+
+    for article in articles:
+        if not is_trusted_source(article.get("url", "")):
+            continue
+        title = (article.get("title") or "").lower()
+        desc  = (article.get("description") or "").lower()
+        text  = title + " " + desc
+        matched = {}
+        for keyword, sym in TICKER_KEYWORDS.items():
+            if keyword in text:
+                matched[sym] = matched.get(sym, 0) + 1
+        if not matched:
+            continue
+        score = 0
+        for word, weight in POSITIVE_WORDS.items():
+            if word in text:
+                score += weight
+        for word, weight in NEGATIVE_WORDS.items():
+            if word in text:
+                score -= weight
+        if score == 0:
+            continue
+        for sym in matched:
+            contribution = min(abs(score), 3) * (1 if score > 0 else -1)
+            ticker_scores[sym] = ticker_scores.get(sym, 0) + contribution
+            if sym not in ticker_reasons:
+                ticker_reasons[sym] = article.get("title", "")
+
+    signals = []
+    for sym, total_score in ticker_scores.items():
+        if abs(total_score) >= MIN_SIGNAL_SCORE:
+            sentiment = "BUY" if total_score > 0 else "SELL"
+            signals.append((sym, sentiment, total_score, ticker_reasons.get(sym, "")))
+            log.info("Signal: %s %s score=%+d" % (sentiment, sym, total_score))
+    signals.sort(key=lambda x: abs(x[2]), reverse=True)
+    return signals
+
+def get_account():
+    return trading_client.get_account()
+
+def get_portfolio_value():
+    return float(get_account().portfolio_value)
+
+def get_current_price(ticker):
+    req   = StockLatestQuoteRequest(symbol_or_symbols=ticker)
+    quote = data_client.get_stock_latest_quote(req)
+    return float(quote[ticker].ask_price)
+
+def get_all_positions():
+    try:
+        return {p.symbol: p for p in trading_client.get_all_positions()}
+    except Exception as e:
+        log.error("Error fetching positions: %s" % e)
+        return {}
+
+def place_order(ticker, side, dollars):
+    try:
+        price = get_current_price(ticker)
+        qty   = round(dollars / price, 6)
+        if qty < 0.001:
+            return None
+        req = MarketOrderRequest(
+            symbol=ticker, qty=qty,
+            side=side, time_in_force=TimeInForce.DAY
+        )
+        order = trading_client.submit_order(req)
+        log.info("Order: %s %.4f %s @ ~$%.2f" % (side.value.upper(), qty, ticker, price))
+        return order
+    except Exception as e:
+        log.error("Order failed %s: %s" % (ticker, e))
+        return None
+
+def close_position(ticker):
+    try:
+        trading_client.close_position(ticker)
+        log.info("Closed: %s" % ticker)
+    except Exception as e:
+        log.error("Could not close %s: %s" % (ticker, e))
+
+def check_exit_conditions(positions):
+    closed = []
+    for sym, pos in positions.items():
+        try:
+            avg_entry  = float(pos.avg_entry_price)
+            curr_price = float(pos.current_price)
+            change_pct = (curr_price - avg_entry) / avg_entry
+            if change_pct <= -STOP_LOSS_PCT:
+                log.warning("STOP-LOSS %s: %.1f%%" % (sym, change_pct * 100))
+                close_position(sym)
+                closed.append(sym)
+                send_sms("Stop-loss: %s (%.1f%%). Closed." % (sym, change_pct * 100))
+            elif change_pct >= TAKE_PROFIT_PCT:
+                log.info("TAKE-PROFIT %s: +%.1f%%" % (sym, change_pct * 100))
+                close_position(sym)
+                closed.append(sym)
+                send_sms("Take-profit: %s (+%.1f%%). Gains locked!" % (sym, change_pct * 100))
+        except Exception as e:
+            log.error("Exit check error %s: %s" % (sym, e))
+    return closed
+
+def run_bot(starting_balance):
+    log.info("Bot LIVE | $%.2f | Stop: 3%% | Take-profit: 8%%" % starting_balance)
+    send_sms("Bot started LIVE: $%.2f. 3%% stop-loss, 8%% take-profit." % starting_balance)
+
+    last_milestone    = 0.0
+    cooldown_map      = {}
+    cycle             = 0
+    premarket_scanned = False
+
+    while True:
+        try:
+            cycle += 1
+            now_et = get_et_time()
+            log.info("--- Cycle %d | %s ---" % (cycle, now_et.strftime("%a %H:%M ET")))
+
+            cooldown_map = {k: v - 1 for k, v in cooldown_map.items() if v > 1}
+
+            if is_premarket() and not premarket_scanned:
+                log.info("Pre-market scan...")
+                signals = get_news_signals()
+                premarket_scanned = True
+                send_sms("Pre-market scan done. %d signals ready." % len(signals))
+                time.sleep(60)
+                continue
+
+            if is_market_open():
+                premarket_scanned = False
+
+            if not is_market_open():
+                secs = seconds_until_open()
+                hrs  = secs // 3600
+                mins = (secs % 3600) // 60
+                log.info("Market closed. Opens in %dh %dm." % (hrs, mins))
+                time.sleep(min(300, secs))
+                continue
+
+            portfolio_value = get_portfolio_value()
+            profit          = portfolio_value - starting_balance
+            log.info("Portfolio: $%.2f | Profit: $%+.2f" % (portfolio_value, profit))
+
+            if profit >= WITHDRAW_AT:
+                send_sms("Bot hit $%.0f profit! Portfolio: $%.2f. Paused." % (WITHDRAW_AT, portfolio_value))
+                for sym in get_all_positions():
+                    close_position(sym)
+                break
+
+            if profit > 0:
+                milestone_hit = int(profit / MILESTONE_EVERY) * MILESTONE_EVERY
+                if milestone_hit > last_milestone:
+                    send_sms("+$%.0f milestone! Portfolio: $%.2f" % (milestone_hit, portfolio_value))
+                    last_milestone = milestone_hit
+
+            positions = get_all_positions()
+            closed    = check_exit_conditions(positions)
+            for sym in closed:
+                cooldown_map[sym] = COOLDOWN_CYCLES
+
+            red_day   = is_red_day()
+            if red_day:
+                log.info("Red day: skipping new buys.")
+
+            positions    = get_all_positions()
+            signals      = get_news_signals()
+            buys_made    = 0
+            max_new_buys = MAX_POSITIONS - len(positions)
+
+            if signals:
+                account      = get_account()
+                buying_power = float(account.buying_power)
+                trade_size   = min(buying_power * TRADE_SIZE_PCT, MAX_TRADE_USD)
+
+                for ticker, sentiment, score, headline in signals:
+                    if ticker in cooldown_map:
+                        continue
+                    if sentiment == "BUY":
+                        if red_day or buys_made >= max_new_buys or ticker in positions or trade_size < 1.0:
+                            continue
+                        result = place_order(ticker, OrderSide.BUY, trade_size)
+                        if result:
+                            buys_made += 1
+                            cooldown_map[ticker] = COOLDOWN_CYCLES
+                    elif sentiment == "SELL":
+                        if ticker in positions:
+                            close_position(ticker)
+                            cooldown_map[ticker] = COOLDOWN_CYCLES
+
+            log.info("Sleeping 15 min...")
+            time.sleep(15 * 60)
+
+        except KeyboardInterrupt:
+            log.info("Bot stopped.")
+            send_sms("Bot stopped manually.")
+            break
+        except Exception as e:
+            log.error("Unexpected error: %s" % e)
+            time.sleep(60)
+
+if __name__ == "__main__":
+    run_bot(STARTING_BALANCE)
